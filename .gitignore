@@ -1,0 +1,9 @@
+# Dependencies
+/node_modules
+
+# Ambient variables and credentials
+.env
+
+# Build files
+/dist
+/build
