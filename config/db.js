@@ -1,18 +1,27 @@
 // backend/config/db.js
-const mysql = require('mysql2/promise');
-require('dotenv').config(); // Per caricare le variabili da .env
+const postgres = require('postgres');
+require('dotenv').config();
 
-// Crea il pool di connessioni
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'test_db',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+// Preferisci una singola connection string (DATABASE_URL), altrimenti componi dai singoli campi
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.warn("ATTENZIONE: Nessuna DATABASE_URL trovata nelle variabili d'ambiente. Assicurati di impostarla.");
+}
+
+// Inizializza il client PostgreSQL. Abilita SSL per le connessioni a Supabase/hosting.
+const sql = postgres(connectionString, {
+  ssl: { rejectUnauthorized: false },
 });
 
-console.log('Database Pool creato.');
+// Test della connessione in background
+(async () => {
+  try {
+    await sql`SELECT 1`;
+    console.log('✅ Connesso al database PostgreSQL.');
+  } catch (err) {
+    console.error('❌ Errore di connessione al database:', err && err.message ? err.message : err);
+  }
+})();
 
-module.exports = pool;
+module.exports = sql;
