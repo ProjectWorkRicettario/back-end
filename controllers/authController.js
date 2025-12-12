@@ -54,8 +54,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// logout rimane identico
-
 // 3. Logout - Distrugge la sessione nel server
 exports.logout = (req, res) => {
   req.session.destroy((err) => {
