@@ -13,6 +13,7 @@ const userRoutes = require('./routes/user');
 require('./config/db'); // Inizializza la connessione DB
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 // *** 2. Applica il middleware CORS usando le opzioni importate ***
 app.use(cors(corsOptions));
@@ -38,3 +39,7 @@ app.use(session({
 app.use('/api/auth', authRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/user', userRoutes);
+
+app.listen(PORT, () => {
+    console.log(`✅ Backend server attivo sulla porta: ${PORT}`);
+});
