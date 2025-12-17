@@ -1,9 +1,4 @@
-// backend/config/corsOptions.js
-
-const allowedOrigins = [
-  // L'URL del frontend
-  "http://localhost:5173",
-];
+const allowedOrigins = process.env.FRONTEND_URL;
 
 const corsOptions = {
   // La funzione 'origin' controlla se l'origine della richiesta è nella lista 'allowedOrigins'
