@@ -10,6 +10,7 @@ const corsOptions = require("./config/corsOptions");
 const authRoutes = require("./routes/auth");
 const inventoryRoutes = require("./routes/inventory");
 const userRoutes = require("./routes/user");
+const recipesRoutes = require("./routes/recipes");
 require("./config/db"); // Inizializza la connessione DB
 
 const app = express();
@@ -20,6 +21,8 @@ app.set("trust proxy", 1);
 
 // *** 2. Applica il middleware CORS usando le opzioni importate ***
 app.use(cors(corsOptions));
+// Rispondi alle preflight OPTIONS con le stesse opzioni CORS
+app.options('*', cors(corsOptions));
 
 // Middleware per leggere JSON
 app.use(express.json());
@@ -44,6 +47,7 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/user", userRoutes);
+app.use('/api/recipes', recipesRoutes);
 
 app.listen(PORT, () => {
   console.log(`✅ Backend server attivo sulla porta: ${PORT}`);
