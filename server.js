@@ -21,8 +21,6 @@ app.set("trust proxy", 1);
 
 // *** 2. Applica il middleware CORS usando le opzioni importate ***
 app.use(cors(corsOptions));
-// Rispondi alle preflight OPTIONS con le stesse opzioni CORS
-app.options('*', cors(corsOptions));
 
 // Middleware per leggere JSON
 app.use(express.json());
