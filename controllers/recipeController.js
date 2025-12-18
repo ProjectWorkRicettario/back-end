@@ -15,19 +15,46 @@ exports.generateRecipes = async (req, res) => {
       .map((i) => `${i.name} (${i.quantity})`)
       .join(", ");
 
-    const prompt = `Genera esattamente 3 ricette di cucina creative in formato JSON. Usa SOLO gli ingredienti disponibili nel seguente inventario: ${itemsList}.\n\nOgni ricetta deve avere: title, ingredients (array di oggetti con name e quantity), steps (array di istruzioni testuali), estimated_time (string).\n\nRispondi SOLO con un JSON array con 3 oggetti. Esempio: [{"title":"...","ingredients":[{"name":"","quantity":""}],"steps":["..."],"estimated_time":"30 min"}, ...]`;
+    const prompt = `
+        Sei uno chef esperto. Genera esattamente 3 ricette in formato JSON rigoroso (RFC 8259).
+        Usa SOLO gli ingredienti: ${itemsList}.
+
+        Regole Tassative:
+        1. Rispondi SOLO con il JSON array. Niente testo prima o dopo.
+        2. Usa le doppie virgolette per tutte le chiavi e le stringhe (es: "name": "valore").
+        3. NESSUNA virgola finale (trailing comma) dopo l'ultimo elemento.
+
+        Struttura richiesta:
+        [
+        {
+            "title": "Nome Ricetta",
+            "ingredients": [{"name": "Ingrediente", "quantity": "Qta"}],
+            "steps": ["Step 1", "Step 2"],
+            "estimated_time": "30 min"
+        }
+        ]
+        `;
 
     // 2) Chiama l'API Gemini
     const output = await callAI(prompt);
 
-    // 3) Parsiamo il JSON dall'output del modello (tolleranza a eventuale testo extra)
+    // 3) Pulizia aggressiva del JSON
     let jsonText = output.trim();
-    // Spesso il modello possa includere testo prima o dopo il JSON; cerchiamo il primo '[' e l'ultimo ']'
+
+    // Rimuoviamo eventuali blocchi markdown tipo ```json o ```
+    jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "");
+
+    // Cerchiamo la prima parentesi quadra aperta e l'ultima chiusa
     const firstIdx = jsonText.indexOf("[");
     const lastIdx = jsonText.lastIndexOf("]");
+
     if (firstIdx !== -1 && lastIdx !== -1) {
-      jsonText = jsonText.slice(firstIdx, lastIdx + 1);
+      jsonText = jsonText.substring(firstIdx, lastIdx + 1);
     }
+
+    // FIX EXTRA: A volte Gemini mette virgole finali illegali (trailing commas)
+    // Questo è un trucco regex per rimuoverle prima di chiudere } o ]
+    jsonText = jsonText.replace(/,\s*([\]}])/g, "$1");
 
     let recipes;
     try {
@@ -35,9 +62,13 @@ exports.generateRecipes = async (req, res) => {
       if (!Array.isArray(recipes))
         throw new Error("Parsed content is not an array");
     } catch (err) {
-      console.error("Errore parsing JSON da Gemini:", err.message);
+      // Se fallisce, stampiamo il testo che ha causato l'errore per debuggarlo
+      console.error("JSON PARSE ERROR. Text was:", jsonText);
+      console.error("Original Error:", err.message);
+
       return res.status(500).json({
         message: "Errore nel parsing della risposta del generatore di ricette.",
+        debugInfo: err.message, // Opzionale: rimandalo al frontend per vederlo subito
       });
     }
 
