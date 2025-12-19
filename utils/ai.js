@@ -2,7 +2,9 @@ const AI_API_KEY = process.env.AI_API_KEY;
 const AI_MODEL = process.env.AI_MODEL || "gemini-2.5-flash";
 
 async function callAI(prompt) {
-  if (!AI_API_KEY) throw new Error("AI_API_KEY non impostata");
+  if (!AI_API_KEY) {
+    throw new Error("AI_API_KEY non impostata");
+  }
 
   const _fetch =
     typeof fetch !== "undefined" ? fetch : (await import("node-fetch")).default;
@@ -18,7 +20,36 @@ async function callAI(prompt) {
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: 1024,
+
+      // ⚠️ IMPORTANTE: JSON strutturato garantito
       responseMimeType: "application/json",
+
+      responseSchema: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            ingredients: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  quantity: { type: "string" },
+                },
+                required: ["name", "quantity"],
+              },
+            },
+            steps: {
+              type: "array",
+              items: { type: "string" },
+            },
+            estimated_time: { type: "string" },
+          },
+          required: ["title", "ingredients", "steps", "estimated_time"],
+        },
+      },
     },
   };
 
@@ -30,27 +61,32 @@ async function callAI(prompt) {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error(`Gemini API Error: ${res.status} - ${text}`);
-    throw new Error(`AI API error: ${res.status} ${text}`);
+    console.error("Gemini API Error:", res.status, text);
+    throw new Error(`AI API error: ${res.status}`);
   }
 
   const data = await res.json();
 
-  // Estrazione della risposta specifica per Gemini
-  let textOut = null;
-  if (
-    data.candidates &&
-    data.candidates[0] &&
-    data.candidates[0].content &&
-    data.candidates[0].content.parts &&
-    data.candidates[0].content.parts[0]
-  ) {
-    textOut = data.candidates[0].content.parts[0].text;
+  /*
+    Con responseSchema:
+    Gemini restituisce SEMPRE JSON valido
+    in candidates[0].content.parts[0].text
+  */
+  const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!textOut) {
+    throw new Error("Risposta vuota da Gemini");
   }
 
-  if (!textOut) throw new Error("Nessuna risposta generata dall'AI");
+  let parsed;
+  try {
+    parsed = JSON.parse(textOut);
+  } catch (err) {
+    console.error("JSON NON PARSABILE:", textOut);
+    throw new Error("Risposta AI non è JSON valido");
+  }
 
-  return textOut;
+  return parsed;
 }
 
 module.exports = { callAI };

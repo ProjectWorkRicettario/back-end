@@ -1,96 +1,85 @@
 const db = require("../config/db");
 const { callAI } = require("../utils/ai");
 
-// Genera 3 ricette usando l'inventario dell'utente e le salva nel DB
+// ===============================
+// POST /api/recipes/generate
+// Genera 3 ricette usando l'inventario dell'utente
+// ===============================
 exports.generateRecipes = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // 1) Prendi inventario dell'utente
+    // 1) Recupera inventario utente
     const inventory =
       await db`SELECT name, quantity FROM inventory WHERE user_id = ${userId}`;
 
-    // Costruiamo il prompt: chiediamo 3 ricette in formato JSON
+    if (!inventory || inventory.length === 0) {
+      return res.status(400).json({
+        message:
+          "Inventario vuoto. Aggiungi ingredienti prima di generare ricette.",
+      });
+    }
+
+    // 2) Costruzione prompt
     const itemsList = inventory
       .map((i) => `${i.name} (${i.quantity})`)
       .join(", ");
 
     const prompt = `
-        Sei uno chef esperto. Genera esattamente 3 ricette in formato JSON rigoroso (RFC 8259).
-        Usa SOLO gli ingredienti: ${itemsList}.
+Sei uno chef esperto.
+Genera ESATTAMENTE 3 ricette usando SOLO questi ingredienti:
+${itemsList}
 
-        Regole Tassative:
-        1. Rispondi SOLO con il JSON array. Niente testo prima o dopo.
-        2. Usa le doppie virgolette per tutte le chiavi e le stringhe (es: "name": "valore").
-        3. NESSUNA virgola finale (trailing comma) dopo l'ultimo elemento.
+Rispetta queste regole:
+- Usa solo ingredienti forniti
+- Ricette realistiche
+- Nessun testo extra, solo dati strutturati
+`;
 
-        Struttura richiesta:
-        [
-        {
-            "title": "Nome Ricetta",
-            "ingredients": [{"name": "Ingrediente", "quantity": "Qta"}],
-            "steps": ["Step 1", "Step 2"],
-            "estimated_time": "30 min"
-        }
-        ]
-        `;
+    // 3) Chiamata AI (restituisce già un array JS)
+    const recipes = await callAI(prompt);
 
-    // 2) Chiama l'API Gemini
-    const output = await callAI(prompt);
-
-    // 3) Pulizia aggressiva del JSON
-    let jsonText = output.trim();
-
-    // Rimuoviamo eventuali blocchi markdown tipo ```json o ```
-    jsonText = jsonText.replace(/```json/g, "").replace(/```/g, "");
-
-    // Cerchiamo la prima parentesi quadra aperta e l'ultima chiusa
-    const firstIdx = jsonText.indexOf("[");
-    const lastIdx = jsonText.lastIndexOf("]");
-
-    if (firstIdx !== -1 && lastIdx !== -1) {
-      jsonText = jsonText.substring(firstIdx, lastIdx + 1);
+    if (!Array.isArray(recipes)) {
+      throw new Error("Risposta AI non è un array");
     }
 
-    // FIX EXTRA: A volte Gemini mette virgole finali illegali (trailing commas)
-    // Questo è un trucco regex per rimuoverle prima di chiudere } o ]
-    jsonText = jsonText.replace(/,\s*([\]}])/g, "$1");
-
-    let recipes;
-    try {
-      recipes = JSON.parse(jsonText);
-      if (!Array.isArray(recipes))
-        throw new Error("Parsed content is not an array");
-    } catch (err) {
-      // Se fallisce, stampiamo il testo che ha causato l'errore per debuggarlo
-      console.error("JSON PARSE ERROR. Text was:", jsonText);
-      console.error("Original Error:", err.message);
-
-      return res.status(500).json({
-        message: "Errore nel parsing della risposta del generatore di ricette.",
-        debugInfo: err.message, // Opzionale: rimandalo al frontend per vederlo subito
-      });
-    }
-
-    // 4) Inserisci ogni ricetta nel DB (ROWS: id, user_id, title, ingredients jsonb, steps jsonb, estimated_time)
+    // 4) Inserimento nel DB
     const inserted = [];
+
     for (const r of recipes.slice(0, 3)) {
       const title = (r.title || "").slice(0, 200);
-      const ingredients = r.ingredients || [];
-      const steps = r.steps || [];
+      const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
+      const steps = Array.isArray(r.steps) ? r.steps : [];
       const estimated_time = r.estimated_time || null;
 
       const rows = await db`
-        INSERT INTO recipes (user_id, title, ingredients, steps, estimated_time)
-        VALUES (${userId}, ${title}, ${ingredients}, ${steps}, ${estimated_time})
+        INSERT INTO recipes (
+          user_id,
+          title,
+          ingredients,
+          steps,
+          estimated_time
+        )
+        VALUES (
+          ${userId},
+          ${title},
+          ${ingredients},
+          ${steps},
+          ${estimated_time}
+        )
         RETURNING *
       `;
 
-      inserted.push(rows && rows[0] ? rows[0] : null);
+      if (rows && rows[0]) {
+        inserted.push(rows[0]);
+      }
     }
 
-    // 5) Restituisci le ricette appena create
-    res.status(201).json({ message: "Ricette generate", recipes: inserted });
+    // 5) Risposta
+    res.status(201).json({
+      message: "Ricette generate con successo",
+      recipes: inserted,
+    });
   } catch (error) {
     console.error("Errore generateRecipes:", error);
     res.status(500).json({
@@ -99,16 +88,32 @@ exports.generateRecipes = async (req, res) => {
   }
 };
 
+// ===============================
 // GET /api/recipes
-// Ritorna tutte le ricette generate dall'utente
+// Ritorna tutte le ricette dell'utente
+// ===============================
 exports.getRecipes = async (req, res) => {
   try {
     const userId = req.user.id;
-    const rows =
-      await db`SELECT id, title, ingredients, steps, estimated_time, created_at FROM recipes WHERE user_id = ${userId} ORDER BY created_at DESC`;
+
+    const rows = await db`
+      SELECT
+        id,
+        title,
+        ingredients,
+        steps,
+        estimated_time,
+        created_at
+      FROM recipes
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+    `;
+
     res.status(200).json(rows);
   } catch (error) {
     console.error("Errore getRecipes:", error);
-    res.status(500).json({ message: "Errore nel recupero delle ricette." });
+    res.status(500).json({
+      message: "Errore nel recupero delle ricette.",
+    });
   }
 };
