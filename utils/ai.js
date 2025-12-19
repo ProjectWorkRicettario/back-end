@@ -19,9 +19,7 @@ async function callAI(prompt) {
     ],
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 1024,
-
-      // ⚠️ IMPORTANTE: JSON strutturato garantito
+      maxOutputTokens: 4096,
       responseMimeType: "application/json",
 
       responseSchema: {
