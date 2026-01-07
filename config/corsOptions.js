@@ -11,8 +11,8 @@ const corsOptions = {
       callback(new Error("Non consentito da CORS"));
     }
   },
-  // CRUCIALE: Permette al frontend di inviare e ricevere cookie di sessione.
-  credentials: true,
+  // Non usiamo più cookie di sessione lato browser.
+  credentials: false,
   // Metodi HTTP che il frontend può usare
   methods: ["GET", "POST", "PUT", "DELETE"],
   // Header che il frontend può inviare

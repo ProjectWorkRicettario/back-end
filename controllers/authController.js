@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken');
 
 // register
 exports.register = async (req, res) => {
@@ -18,7 +19,11 @@ exports.register = async (req, res) => {
       RETURNING id, email
     `;
 
-    res.status(201).json({ message: "Registrazione completata.", user: inserted && inserted[0] });
+    const user = inserted && inserted[0];
+    // Genera JWT per il nuovo utente (7 giorni)
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(201).json({ message: "Registrazione completata.", user, token });
   } catch (error) {
     console.error("Errore di registrazione:", error);
     if (error && error.code === '23505') {
@@ -41,29 +46,23 @@ exports.login = async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ message: "Credenziali non valide." });
 
-    req.session.userId = user.id;
-    res
-      .status(200)
-      .json({
-        message: "Login effettuato!",
-        user: { id: user.id, email: user.email },
-      });
+    // Genera un JWT e lo restituisce al client (stateless)
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(200).json({
+      message: "Login effettuato!",
+      user: { id: user.id, email: user.email },
+      token,
+    });
   } catch (error) {
     console.error("Errore di login:", error);
     res.status(500).json({ message: "Errore interno del server." });
   }
 };
 
-// 3. Logout - Distrugge la sessione nel server
+// Logout (stateless - il client si occuperà di rimuovere il token)
 exports.logout = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("Errore durante il logout:", err);
-      return res
-        .status(500)
-        .json({ message: "Errore durante la disconnessione." });
-    }
-    // Il browser non riceverà più il cookie di sessione valido
-    res.status(200).json({ message: "Logout avvenuto con successo." });
-  });
+  // Con JWT stateless non possiamo invalidare il token senza un blacklist;
+  // per ora rispondiamo semplicemente OK e il client cancellerà il token locale.
+  res.status(200).json({ message: "Logout avvenuto con successo." });
 };

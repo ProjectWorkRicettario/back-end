@@ -1,7 +1,6 @@
 // backend/server.js
 const express = require("express");
 const cors = require("cors");
-const session = require("express-session");
 require("dotenv").config();
 
 // *** 1. Importa la configurazione CORS ***
@@ -25,21 +24,6 @@ app.use(cors(corsOptions));
 // Middleware per leggere JSON
 app.use(express.json());
 
-// Configurazione Sessione (proxy:true abilitato, cookie Secure/SameSite=None per HTTPS)
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    proxy: true,
-    cookie: {
-      secure: true,
-      sameSite: "none",
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24,
-    },
-  })
-);
 
 // Rotte
 app.use("/api/auth", authRoutes);
