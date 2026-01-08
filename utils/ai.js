@@ -1,5 +1,5 @@
 const AI_API_KEY = process.env.AI_API_KEY;
-const AI_MODEL = process.env.AI_MODEL || "gemini-2.5-flash";
+const AI_MODEL = process.env.AI_MODEL || "gemini-2.5-flash-lite";
 
 async function callAI(prompt) {
   if (!AI_API_KEY) {

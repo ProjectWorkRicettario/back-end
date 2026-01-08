@@ -26,15 +26,16 @@ exports.generateRecipes = async (req, res) => {
       .join(", ");
 
     const prompt = `
-Sei uno chef esperto.
-Genera ESATTAMENTE 3 ricette usando SOLO questi ingredienti:
-${itemsList}
+        Sei uno chef esperto.
+        Genera ESATTAMENTE 3 ricette usando SOLO questi ingredienti:
+        ${itemsList}
 
-Rispetta queste regole:
-- Usa solo ingredienti forniti
-- Ricette realistiche
-- Nessun testo extra, solo dati strutturati
-`;
+        Rispetta queste regole:
+        - Usa solo ingredienti forniti
+        - Ricette realistiche
+        - Nessun testo extra, solo dati strutturati
+        - Rispondi solo con un formato json valido
+    `;
 
     // 3) Chiamata AI (restituisce già un array JS)
     const recipes = await callAI(prompt);
