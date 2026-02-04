@@ -118,3 +118,19 @@ exports.getRecipes = async (req, res) => {
     });
   }
 };
+
+
+exports.deleteRecipe = async (req, res) => {
+  const { recipeId } = req.params;
+  try {
+    const deleted = await db`
+      DELETE FROM recipes 
+      WHERE id = ${recipeId} AND user_id = ${req.user.id}
+      RETURNING *
+    `;
+    if (!deleted.length) return res.status(404).json({ message: "Ricetta non trovata." });
+    res.status(200).json({ message: "Ricetta eliminata con successo." });
+  } catch (error) {
+    res.status(500).json({ message: "Errore durante l'eliminazione." });
+  }
+};
