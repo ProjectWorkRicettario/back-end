@@ -134,3 +134,58 @@ exports.deleteRecipe = async (req, res) => {
     res.status(500).json({ message: "Errore durante l'eliminazione." });
   }
 };
+
+exports.shareRecipe = async (req, res) => {
+  const { recipeId, receiverEmail } = req.body;
+  const senderId = req.user.id; // Preso dal token di autenticazione
+
+  try {
+    // 1. Troviamo l'ID dell'utente a cui vogliamo inviare la ricetta
+    const receiver = await db`SELECT id FROM users WHERE email = ${receiverEmail}`;
+    
+    if (!receiver || receiver.length === 0) {
+      return res.status(404).json({ message: "Utente destinatario non trovato." });
+    }
+
+    // 2. Inseriamo il record nella tabella delle condivisioni
+    await db`
+      INSERT INTO shared_recipes (sender_id, receiver_id, recipe_id)
+      VALUES (${senderId}, ${receiver[0].id}, ${recipeId})
+    `;
+
+    res.status(200).json({ message: "Ricetta condivisa con successo!" });
+  } catch (error) {
+    console.error("Errore condivisione:", error);
+    res.status(500).json({ message: "Errore interno durante la condivisione." });
+  }
+};
+
+// In controllers/recipeController.js
+
+exports.getSharedRecipes = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Selezioniamo i dati della ricetta facendo un JOIN tra shared_recipes, recipes e users
+    const rows = await db`
+      SELECT 
+        r.id, 
+        r.title, 
+        r.ingredients, 
+        r.steps, 
+        r.estimated_time, 
+        u.email as shared_by,
+        s.created_at
+      FROM shared_recipes s
+      JOIN recipes r ON s.recipe_id = r.id
+      JOIN users u ON s.sender_id = u.id
+      WHERE s.receiver_id = ${userId}
+      ORDER BY s.created_at DESC
+    `;
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error("Errore getSharedRecipes:", error);
+    res.status(500).json({ message: "Errore nel recupero delle ricette condivise." });
+  }
+};
